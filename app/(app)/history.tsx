@@ -1,0 +1,68 @@
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { Button, Card, EmptyState, Header, Screen } from '@/components/ui';
+import { useApp } from '@/context/AppContext';
+import { colors, spacing } from '@/theme';
+import type { SaleHeader } from '@/types';
+import { formatDate, formatMoney } from '@/utils';
+
+export default function HistoryScreen() {
+  const { data, user } = useApp();
+  const [selected, setSelected] = useState<SaleHeader | null>(null);
+  if (!data || !user) return null;
+  const sales = data.saleHeaders
+    .filter((sale) => user.role === 'admin' || sale.clientId === user.clientId)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <Screen>
+      <Header eyebrow="Movimientos" title={user.role === 'admin' ? 'Historial de ventas' : 'Mis compras'} subtitle="Las ventas confirmadas son inmutables." />
+      {!sales.length ? <EmptyState icon="receipt-outline" title="Sin movimientos" message={user.role === 'admin' ? 'Las ventas confirmadas aparecerán aquí.' : 'Cuando realices una compra podrás consultar su detalle aquí.'} /> : sales.map((sale) => {
+        const client = data.clients.find((item) => item.id === sale.clientId);
+        const count = data.saleDetails.filter((detail) => detail.headerId === sale.id).reduce((sum, detail) => sum + detail.quantity, 0);
+        return (
+          <Pressable key={sale.id} accessibilityRole="button" accessibilityLabel={`Ver venta de ${formatMoney(sale.total)}`} onPress={() => setSelected(sale)}>
+            <Card>
+              <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.name}>{client?.name ?? 'Cliente'}</Text><Text style={styles.muted}>{formatDate(sale.date)} · {count} artículo(s)</Text></View><Text style={styles.total}>{formatMoney(sale.total)}</Text></View>
+              <Text style={styles.link}>Ver detalle →</Text>
+            </Card>
+          </Pressable>
+        );
+      })}
+      <SaleDetailModal sale={selected} onClose={() => setSelected(null)} />
+    </Screen>
+  );
+}
+
+function SaleDetailModal({ sale, onClose }: { sale: SaleHeader | null; onClose: () => void }) {
+  const { data } = useApp();
+  if (!sale || !data) return null;
+  const client = data.clients.find((item) => item.id === sale.clientId);
+  const details = data.saleDetails.filter((item) => item.headerId === sale.id);
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <Screen>
+        <Header eyebrow="Comprobante local" title="Detalle de venta" subtitle={`Registrada el ${formatDate(sale.date)}`} />
+        <Card><Text style={styles.label}>Cliente</Text><Text style={styles.name}>{client?.name ?? 'No disponible'}</Text><Text style={styles.muted}>{client?.email}</Text></Card>
+        <Card>
+          <Text style={styles.label}>Productos</Text>
+          {details.map((detail) => {
+            const product = data.products.find((item) => item.id === detail.productId);
+            return <View key={detail.id} style={styles.detailLine}><View style={styles.flex}><Text style={styles.name}>{product?.name ?? 'Producto'}</Text><Text style={styles.muted}>{detail.quantity} × {formatMoney(detail.subtotal / detail.quantity)}</Text></View><Text style={styles.price}>{formatMoney(detail.subtotal)}</Text></View>;
+          })}
+          <View style={styles.divider} /><View style={styles.rowBetween}><Text style={styles.totalLabel}>Total</Text><Text style={styles.bigTotal}>{formatMoney(sale.total)}</Text></View>
+        </Card>
+        <Text style={styles.id}>ID: {sale.id}</Text>
+        <Button title="Cerrar" onPress={onClose} />
+      </Screen>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 }, rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md }, name: { color: colors.text, fontWeight: '800', fontSize: 16 },
+  muted: { color: colors.muted, marginTop: 3 }, total: { color: colors.primary, fontWeight: '900', fontSize: 17 }, link: { color: colors.primary, fontWeight: '700', marginTop: spacing.xs },
+  label: { color: colors.muted, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }, detailLine: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm, borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  price: { color: colors.text, fontWeight: '800' }, divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm }, totalLabel: { color: colors.text, fontWeight: '900', fontSize: 18 }, bigTotal: { color: colors.primary, fontWeight: '900', fontSize: 22 }, id: { color: colors.muted, fontSize: 11, textAlign: 'center' },
+});
+

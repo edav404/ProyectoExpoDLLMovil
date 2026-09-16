@@ -1,0 +1,42 @@
+import type { CartLine, ClientInput, Product, ProductInput } from './types';
+
+export const normalizeEmail = (value: string) => value.trim().toLowerCase();
+export const normalizeText = (value: string) => value.trim().replace(/\s+/g, ' ');
+export const formatMoney = (value: number) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+export const formatDate = (value: string) =>
+  new Intl.DateTimeFormat('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value));
+
+export function validateEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
+}
+
+export function validateBirthDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value && date <= new Date();
+}
+
+export function validatePassword(password: string) {
+  return password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password);
+}
+
+export function validateClient(input: ClientInput) {
+  if (normalizeText(input.name).length < 2) throw new Error('El nombre debe tener al menos 2 caracteres.');
+  if (!validateBirthDate(input.birthDate)) throw new Error('Usa una fecha válida en formato AAAA-MM-DD.');
+  if (!validateEmail(input.email)) throw new Error('Ingresa un correo válido.');
+}
+
+export function validateProduct(input: ProductInput) {
+  if (normalizeText(input.name).length < 2) throw new Error('El nombre debe tener al menos 2 caracteres.');
+  if (!normalizeText(input.description)) throw new Error('La descripción es obligatoria.');
+  if (!Number.isInteger(input.stock) || input.stock < 0) throw new Error('El stock debe ser un entero mayor o igual a cero.');
+  if (!Number.isInteger(input.unitPrice) || input.unitPrice < 0) throw new Error('El precio debe ser un entero mayor o igual a cero.');
+}
+
+export function calculateCartTotal(products: Product[], lines: CartLine[]) {
+  return lines.reduce((sum, line) => {
+    const product = products.find((item) => item.id === line.productId);
+    return sum + (product?.unitPrice ?? 0) * line.quantity;
+  }, 0);
+}
