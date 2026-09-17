@@ -4,7 +4,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Chip, EmptyState, Header, IconButton, Screen } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
-import { colors, radii, spacing } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { calculateCartTotal, formatMoney } from '@/utils';
 
 export default function SaleScreen() {

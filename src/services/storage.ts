@@ -64,7 +64,7 @@ function isAppData(value: unknown): value is AppData {
 function migrateAppData(value: unknown): AppData | null {
   if (isAppData(value)) return value;
   if (!value || typeof value !== 'object') return null;
-  const legacy = value as Partial<AppData> & { version?: number };
+  const legacy = value as Omit<Partial<AppData>, 'version'> & { version?: number };
   if (legacy.version !== undefined && legacy.version !== 0) return null;
   if (!['users', 'clients', 'products', 'saleHeaders', 'saleDetails'].every(
     (key) => Array.isArray(legacy[key as keyof AppData]),

@@ -80,7 +80,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       if (activeUser?.role !== 'admin') throw new Error('Solo un administrador puede restaurar los datos locales.');
       setData(await localStore.reset()); setUserId(null);
     },
-  }), [activeUser, data, ready, sync, userId]);
+  }), [activeUser, data, ready, sync]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

@@ -1,24 +1,16 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Field, Header, Screen } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
-import { colors, spacing } from '@/theme';
+import { colors } from '@/theme';
 
 export default function ProfileScreen() {
   const { data, user, logout, reset, saveClient } = useApp();
   const client = data?.clients.find((item) => item.id === user?.clientId);
-  const [name, setName] = useState(client?.name ?? ''); const [birthDate, setBirthDate] = useState(client?.birthDate ?? ''); const [email, setEmail] = useState(client?.email ?? user?.email ?? ''); const [loading, setLoading] = useState(false);
-  useEffect(() => { setName(client?.name ?? ''); setBirthDate(client?.birthDate ?? ''); setEmail(client?.email ?? user?.email ?? ''); }, [client?.birthDate, client?.email, client?.name, user?.email]);
   if (!data || !user) return null;
   const signOut = async () => { await logout(); router.replace('/'); };
-  const save = async () => {
-    if (!client) return;
-    setLoading(true); try { await saveClient({ name, birthDate, email }, client.id); Alert.alert('Perfil actualizado', 'Tus datos se guardaron correctamente.'); }
-    catch (error) { Alert.alert('Revisa los datos', error instanceof Error ? error.message : 'No pudimos guardar el perfil.'); }
-    finally { setLoading(false); }
-  };
   const restore = () => Alert.alert('Restaurar datos locales', 'Se eliminarán usuarios, clientes, productos y ventas de este dispositivo. Solo se recreará la cuenta admin de demostración.', [
     { text: 'Cancelar', style: 'cancel' },
     { text: 'Restaurar', style: 'destructive', onPress: () => void reset().then(() => router.replace('/')).catch((error) => Alert.alert('No pudimos restaurar', error instanceof Error ? error.message : 'Intenta nuevamente.')) },
@@ -31,13 +23,7 @@ export default function ProfileScreen() {
         <Text style={styles.role}>{user.role === 'admin' ? 'Administrador' : 'Cliente'}</Text>
         <Text style={styles.email}>{user.email}</Text>
       </Card>
-      {client ? <Card>
-        <Text style={styles.sectionTitle}>Datos personales</Text>
-        <Field label="Nombre completo" value={name} onChangeText={setName} />
-        <Field label="Fecha de nacimiento" value={birthDate} onChangeText={setBirthDate} placeholder="AAAA-MM-DD" maxLength={10} />
-        <Field label="Correo" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <Button title="Guardar cambios" onPress={save} loading={loading} />
-      </Card> : null}
+      {client ? <ProfileEditor key={client.id} client={client} saveClient={saveClient} /> : null}
       {user.role === 'admin' ? <Card>
         <Text style={styles.sectionTitle}>Datos locales</Text>
         <Text style={styles.description}>Esta instalación contiene {data.clients.length} clientes, {data.products.length} productos y {data.saleHeaders.length} ventas.</Text>
@@ -47,6 +33,26 @@ export default function ProfileScreen() {
       <Text style={styles.note}>VentaLocal guarda toda la información únicamente en este dispositivo.</Text>
     </Screen>
   );
+}
+
+function ProfileEditor({ client, saveClient }: { client: NonNullable<ReturnType<typeof useApp>['data']>['clients'][number]; saveClient: ReturnType<typeof useApp>['saveClient'] }) {
+  const [name, setName] = useState(client.name);
+  const [birthDate, setBirthDate] = useState(client.birthDate);
+  const [email, setEmail] = useState(client.email);
+  const [loading, setLoading] = useState(false);
+  const save = async () => {
+    setLoading(true);
+    try { await saveClient({ name, birthDate, email }, client.id); Alert.alert('Perfil actualizado', 'Tus datos se guardaron correctamente.'); }
+    catch (error) { Alert.alert('Revisa los datos', error instanceof Error ? error.message : 'No pudimos guardar el perfil.'); }
+    finally { setLoading(false); }
+  };
+  return <Card>
+    <Text style={styles.sectionTitle}>Datos personales</Text>
+    <Field label="Nombre completo" value={name} onChangeText={setName} />
+    <Field label="Fecha de nacimiento" value={birthDate} onChangeText={setBirthDate} placeholder="AAAA-MM-DD" maxLength={10} />
+    <Field label="Correo" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+    <Button title="Guardar cambios" onPress={save} loading={loading} />
+  </Card>;
 }
 
 const styles = StyleSheet.create({
