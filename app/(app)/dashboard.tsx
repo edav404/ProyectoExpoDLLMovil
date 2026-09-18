@@ -14,7 +14,8 @@ export default function DashboardScreen() {
   const visibleSales = isAdmin ? data.saleHeaders : data.saleHeaders.filter((sale) => sale.clientId === user.clientId);
   const revenue = visibleSales.reduce((sum, sale) => sum + sale.total, 0);
   const lowStock = data.products.filter((product) => product.stock <= 5).length;
-  const name = user.clientId ? data.clients.find((client) => client.id === user.clientId)?.name : 'Administrador';
+  const clientRec = user.clientId ? data.clients.find((client) => client.id === user.clientId) : null;
+  const name = clientRec?.firstName ?? (user.role === 'admin' ? 'Administrador' : undefined);
   return (
     <Screen>
       <Header eyebrow="VentaLocal" title={`Hola, ${name?.split(' ')[0] ?? 'de nuevo'}`} subtitle={isAdmin ? 'Este es el estado de tu negocio local.' : 'Consulta el catálogo y tus compras recientes.'} />

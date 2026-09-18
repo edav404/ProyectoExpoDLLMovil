@@ -3,6 +3,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 import type {
+  ActivateUserInput,
   AppData,
   CartLine,
   Client,
@@ -10,6 +11,7 @@ import type {
   Product,
   ProductInput,
   RegisterInput,
+  Role,
   SaleHeader,
   Session,
   User,
@@ -24,7 +26,8 @@ import {
 } from '../utils';
 
 const DATA_KEY = 'ventalocal:data:v1';
-const SESSION_KEY = 'ventalocal:session';
+// SecureStore solo permite letras, números, puntos, guiones y guiones bajos.
+const SESSION_KEY = 'ventalocal.session';
 const ADMIN_EMAIL = 'admin@demo.com';
 const ADMIN_PASSWORD = 'Admin123*';
 
@@ -45,7 +48,7 @@ async function createSeedData(): Promise<AppData> {
   const password = await passwordRecord(ADMIN_PASSWORD);
   return {
     version: 1,
-    users: [{ id: id(), email: ADMIN_EMAIL, role: 'admin', createdAt: new Date().toISOString(), ...password }],
+    users: [{ id: id(), email: ADMIN_EMAIL, role: 'admin', status: 'active', createdAt: new Date().toISOString(), ...password }],
     clients: [],
     products: [],
     saleHeaders: [],
@@ -71,8 +74,17 @@ function migrateAppData(value: unknown): AppData | null {
   )) return null;
   return {
     version: 1,
-    users: legacy.users!,
-    clients: legacy.clients!,
+    users: (legacy.users ?? []).map((u) => ({ ...u, status: (u as User & { status?: string }).status ?? 'active' as const })),
+    clients: (legacy.clients ?? []).map((c) => {
+      const legacyClient = c as Client & { name?: string };
+      return {
+        id: legacyClient.id ?? '',
+        firstName: legacyClient.firstName ?? legacyClient.name ?? '',
+        lastName: legacyClient.lastName ?? '',
+        birthDate: legacyClient.birthDate ?? '',
+        email: legacyClient.email ?? '',
+      };
+    }),
     products: legacy.products!,
     saleHeaders: legacy.saleHeaders!,
     saleDetails: legacy.saleDetails!,
@@ -96,7 +108,7 @@ export class LocalStore {
           return clone(migrated);
         }
       } catch {
-        // A corrupt document is replaced with a safe empty seed below.
+        // Un documento corrupto se reemplaza con el seed vacío a continuación.
       }
     }
     this.data = await createSeedData();
@@ -147,34 +159,67 @@ export class LocalStore {
     if (!user || (await hashPassword(password, user.passwordSalt)) !== user.passwordHash) {
       throw new Error('Correo o contraseña incorrectos.');
     }
+    if (user.status !== 'active') {
+      throw new Error('Tu cuenta aún no ha sido aprobada. Contacta al administrador.');
+    }
     await this.setSession(user.id);
     return user;
   }
 
+  /**
+   * Registra un visitante. La cuenta queda en estado "pending" (pendiente de activación
+   * por un administrador). No inicia sesión automáticamente.
+   */
   async register(input: RegisterInput) {
     const email = normalizeEmail(input.email);
     if (!validateEmail(email)) throw new Error('Ingresa un correo válido.');
     if (!validatePassword(input.password)) {
       throw new Error('La contraseña debe tener 8 caracteres, mayúscula, minúscula y número.');
     }
-    if (input.role === 'client') validateClient({ name: input.name, birthDate: input.birthDate, email });
     const password = await passwordRecord(input.password);
-    const user = await this.update<User>((draft) => {
+    await this.update<User>((draft) => {
       if (draft.users.some((item) => item.email === email) || draft.clients.some((item) => item.email === email)) {
         throw new Error('Este correo ya está registrado.');
       }
-      let clientId: string | undefined;
-      if (input.role === 'client') {
-        const newClientId = id();
-        clientId = newClientId;
-        draft.clients.push({ id: newClientId, name: normalizeText(input.name), birthDate: input.birthDate, email });
-      }
-      const created: User = { id: id(), email, role: input.role, clientId, createdAt: new Date().toISOString(), ...password };
+      const created: User = {
+        id: id(),
+        email,
+        role: 'client', // rol por defecto; el admin puede cambiarlo al activar
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        ...password,
+      };
       draft.users.push(created);
       return created;
     });
-    await this.setSession(user.id);
-    return user;
+    // No iniciamos sesión; el usuario debe esperar aprobación
+  }
+
+  /**
+   * El administrador activa una cuenta pendiente y le asigna un rol.
+   * Si el rol es 'client', se crea el registro vacío en la tabla Client para que
+   * el usuario pueda completar sus datos al ingresar por primera vez.
+   */
+  async activateUser(input: ActivateUserInput) {
+    return this.update<User>((draft) => {
+      const user = draft.users.find((item) => item.id === input.userId);
+      if (!user) throw new Error('Usuario no encontrado.');
+      if (user.status !== 'pending') throw new Error('Esta cuenta ya fue activada.');
+      user.role = input.role as Role;
+      user.status = 'active';
+      if (input.role === 'client' && !user.clientId) {
+        const newClientId = id();
+        user.clientId = newClientId;
+        draft.clients.push({
+          id: newClientId,
+          firstName: '',
+          lastName: '',
+          birthDate: '',
+          email: user.email,
+        });
+      }
+      return user;
+    });
   }
 
   async saveClient(input: ClientInput, clientId?: string) {
@@ -185,7 +230,12 @@ export class LocalStore {
       const linkedUser = clientId ? draft.users.find((item) => item.clientId === clientId) : undefined;
       const duplicateUser = draft.users.some((item) => item.email === email && item.id !== linkedUser?.id);
       if (duplicateClient || duplicateUser) throw new Error('Este correo ya está en uso.');
-      const payload = { name: normalizeText(input.name), birthDate: input.birthDate, email };
+      const payload = {
+        firstName: normalizeText(input.firstName),
+        lastName: normalizeText(input.lastName),
+        birthDate: input.birthDate,
+        email,
+      };
       if (!clientId) {
         const created = { id: id(), ...payload };
         draft.clients.push(created);

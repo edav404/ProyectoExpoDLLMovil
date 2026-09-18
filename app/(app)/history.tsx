@@ -23,7 +23,7 @@ export default function HistoryScreen() {
         return (
           <Pressable key={sale.id} accessibilityRole="button" accessibilityLabel={`Ver venta de ${formatMoney(sale.total)}`} onPress={() => setSelected(sale)}>
             <Card>
-              <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.name}>{client?.name ?? 'Cliente'}</Text><Text style={styles.muted}>{formatDate(sale.date)} · {count} artículo(s)</Text></View><Text style={styles.total}>{formatMoney(sale.total)}</Text></View>
+              <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.name}>{client ? `${client.firstName} ${client.lastName}`.trim() || client.email : 'Cliente'}</Text><Text style={styles.muted}>{formatDate(sale.date)} · {count} artículo(s)</Text></View><Text style={styles.total}>{formatMoney(sale.total)}</Text></View>
               <Text style={styles.link}>Ver detalle →</Text>
             </Card>
           </Pressable>
@@ -43,7 +43,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleHeader | null; onClose: 
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <Screen>
         <Header eyebrow="Comprobante local" title="Detalle de venta" subtitle={`Registrada el ${formatDate(sale.date)}`} />
-        <Card><Text style={styles.label}>Cliente</Text><Text style={styles.name}>{client?.name ?? 'No disponible'}</Text><Text style={styles.muted}>{client?.email}</Text></Card>
+        <Card><Text style={styles.label}>Cliente</Text><Text style={styles.name}>{client ? (`${client.firstName} ${client.lastName}`.trim() || client.email) : 'No disponible'}</Text><Text style={styles.muted}>{client?.email}</Text></Card>
         <Card>
           <Text style={styles.label}>Productos</Text>
           {details.map((detail) => {

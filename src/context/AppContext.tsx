@@ -1,7 +1,7 @@
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { localStore } from '../services/storage';
-import type { AppData, CartLine, ClientInput, ProductInput, RegisterInput, User } from '../types';
+import type { ActivateUserInput, AppData, CartLine, ClientInput, ProductInput, RegisterInput, User } from '../types';
 
 interface AppContextValue {
   ready: boolean;
@@ -10,6 +10,7 @@ interface AppContextValue {
   login(email: string, password: string): Promise<void>;
   register(input: RegisterInput): Promise<void>;
   logout(): Promise<void>;
+  activateUser(input: ActivateUserInput): Promise<void>;
   saveClient(input: ClientInput, id?: string): Promise<void>;
   deleteClient(id: string): Promise<void>;
   saveProduct(input: ProductInput, id?: string): Promise<void>;
@@ -44,16 +45,26 @@ export function AppProvider({ children }: PropsWithChildren) {
     user: activeUser,
     login: async (email, password) => {
       const signedIn = await localStore.login(email, password);
+      sync();
       setUserId(signedIn.id);
     },
+    /**
+     * Registra al visitante con estado "pending". NO inicia sesión automáticamente.
+     * La UI debe mostrar un mensaje de pendiente de aprobación.
+     */
     register: async (input) => {
-      const registered = await localStore.register(input);
+      await localStore.register(input);
       sync();
-      setUserId(registered.id);
+      // No llamamos setUserId: el usuario debe esperar aprobación del admin.
     },
     logout: async () => {
       await localStore.setSession(null);
       setUserId(null);
+    },
+    activateUser: async (input) => {
+      if (activeUser?.role !== 'admin') throw new Error('Solo un administrador puede activar cuentas.');
+      await localStore.activateUser(input);
+      sync();
     },
     saveClient: async (input, id) => {
       if (activeUser?.role !== 'admin' && (!id || activeUser?.clientId !== id)) throw new Error('No tienes permiso para editar este cliente.');

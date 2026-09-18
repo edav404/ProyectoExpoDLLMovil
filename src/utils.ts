@@ -1,4 +1,4 @@
-import type { CartLine, ClientInput, Product, ProductInput } from './types';
+import type { ClientInput } from './types';
 
 export const normalizeEmail = (value: string) => value.trim().toLowerCase();
 export const normalizeText = (value: string) => value.trim().replace(/\s+/g, ' ');
@@ -22,19 +22,20 @@ export function validatePassword(password: string) {
 }
 
 export function validateClient(input: ClientInput) {
-  if (normalizeText(input.name).length < 2) throw new Error('El nombre debe tener al menos 2 caracteres.');
-  if (!validateBirthDate(input.birthDate)) throw new Error('Usa una fecha válida en formato AAAA-MM-DD.');
+  if (normalizeText(input.firstName).length < 2) throw new Error('El nombre debe tener al menos 2 caracteres.');
+  if (normalizeText(input.lastName).length < 2) throw new Error('El apellido debe tener al menos 2 caracteres.');
+  if (input.birthDate && !validateBirthDate(input.birthDate)) throw new Error('Usa una fecha válida en formato AAAA-MM-DD.');
   if (!validateEmail(input.email)) throw new Error('Ingresa un correo válido.');
 }
 
-export function validateProduct(input: ProductInput) {
+export function validateProduct(input: import('./types').ProductInput) {
   if (normalizeText(input.name).length < 2) throw new Error('El nombre debe tener al menos 2 caracteres.');
   if (!normalizeText(input.description)) throw new Error('La descripción es obligatoria.');
   if (!Number.isInteger(input.stock) || input.stock < 0) throw new Error('El stock debe ser un entero mayor o igual a cero.');
   if (!Number.isInteger(input.unitPrice) || input.unitPrice < 0) throw new Error('El precio debe ser un entero mayor o igual a cero.');
 }
 
-export function calculateCartTotal(products: Product[], lines: CartLine[]) {
+export function calculateCartTotal(products: import('./types').Product[], lines: import('./types').CartLine[]) {
   return lines.reduce((sum, line) => {
     const product = products.find((item) => item.id === line.productId);
     return sum + (product?.unitPrice ?? 0) * line.quantity;

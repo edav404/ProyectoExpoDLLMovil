@@ -57,19 +57,24 @@ describe('LocalStore', () => {
     expect(JSON.parse(values.get('ventalocal:data:v1')!).version).toBe(1);
   });
 
-  it('crea y enlaza usuario y cliente al registrarse', async () => {
+  it('crea usuario en estado pendiente al registrarse (sin auto-login)', async () => {
     const store = new LocalStore();
     await store.initialize();
-    const user = await store.register({ name: 'Ana Torres', birthDate: '2000-05-10', email: 'ANA@correo.com', password: 'Segura123', role: 'client' });
-    expect(user.clientId).toBeDefined();
-    expect(store.snapshot().clients[0]).toMatchObject({ name: 'Ana Torres', email: 'ana@correo.com' });
-    await expect(store.register({ name: 'Otra Ana', birthDate: '2001-01-01', email: 'ana@correo.com', password: 'Segura123', role: 'client' })).rejects.toThrow('ya está registrado');
+    await store.register({ email: 'ANA@correo.com', password: 'Segura123' });
+    const snapshot = store.snapshot();
+    const user = snapshot.users.find((u) => u.email === 'ana@correo.com');
+    expect(user).toBeDefined();
+    expect(user?.status).toBe('pending');
+    // No debe poder iniciar sesión hasta ser activado
+    await expect(store.login('ana@correo.com', 'Segura123')).rejects.toThrow('aprobada');
+    // No puede duplicar correo
+    await expect(store.register({ email: 'ana@correo.com', password: 'Segura123' })).rejects.toThrow('ya está registrado');
   });
 
   it('registra encabezado y detalles y descuenta el stock', async () => {
     const store = new LocalStore();
     await store.initialize();
-    const client = await store.saveClient({ name: 'Carlos Pérez', birthDate: '1990-01-01', email: 'carlos@correo.com' });
+    const client = await store.saveClient({ firstName: 'Carlos', lastName: 'Pérez', birthDate: '1990-01-01', email: 'carlos@correo.com' });
     const product = await store.saveProduct({ name: 'Café', description: 'Café molido', stock: 5, unitPrice: 18000 });
     const sale = await store.createSale(client.id, [{ productId: product.id, quantity: 2 }]);
     const data = store.snapshot();
@@ -81,7 +86,7 @@ describe('LocalStore', () => {
   it('rechaza stock insuficiente sin modificar el documento', async () => {
     const store = new LocalStore();
     await store.initialize();
-    const client = await store.saveClient({ name: 'Carlos Pérez', birthDate: '1990-01-01', email: 'carlos@correo.com' });
+    const client = await store.saveClient({ firstName: 'Carlos', lastName: 'Pérez', birthDate: '1990-01-01', email: 'carlos@correo.com' });
     const product = await store.saveProduct({ name: 'Pan', description: 'Pan artesanal', stock: 1, unitPrice: 4000 });
     await expect(store.createSale(client.id, [{ productId: product.id, quantity: 2 }])).rejects.toThrow('Stock insuficiente');
     expect(store.snapshot().products[0].stock).toBe(1);
@@ -91,7 +96,7 @@ describe('LocalStore', () => {
   it('protege clientes y productos referenciados por ventas', async () => {
     const store = new LocalStore();
     await store.initialize();
-    const client = await store.saveClient({ name: 'Laura Ruiz', birthDate: '1995-08-20', email: 'laura@correo.com' });
+    const client = await store.saveClient({ firstName: 'Laura', lastName: 'Ruiz', birthDate: '1995-08-20', email: 'laura@correo.com' });
     const product = await store.saveProduct({ name: 'Té', description: 'Té verde', stock: 4, unitPrice: 6000 });
     await store.createSale(client.id, [{ productId: product.id, quantity: 1 }]);
     await expect(store.deleteClient(client.id)).rejects.toThrow('ventas registradas');
