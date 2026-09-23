@@ -1,4 +1,4 @@
-import { primaryTabLabels, primaryTabs } from '../navigation';
+import { breadcrumbs, primaryTabLabels, primaryTabs } from '../navigation';
 
 describe('navegación principal', () => {
   it('mantiene cuatro accesos principales para cada rol', () => {
@@ -11,5 +11,13 @@ describe('navegación principal', () => {
     expect(primaryTabLabels.admin.sale).toBe('Vender');
     expect(primaryTabLabels.client.sale).toBe('Comprar');
     expect(primaryTabLabels.client.products).toBe('Catálogo');
+  });
+
+  it('arma la miga para volver sin enlazar la pantalla actual', () => {
+    expect(breadcrumbs('/history', 'admin').map((crumb) => crumb.label)).toEqual(['Inicio', 'Más', 'Historial']);
+    expect(breadcrumbs('/history', 'admin').at(-1)?.href).toBeUndefined();
+    expect(breadcrumbs('/history', 'admin')[0].href).toBe('/dashboard');
+    expect(breadcrumbs('/sale', 'client').map((crumb) => crumb.label)).toEqual(['Inicio', 'Comprar']);
+    expect(breadcrumbs('/', null)).toEqual([{ label: 'Inicio' }]);
   });
 });

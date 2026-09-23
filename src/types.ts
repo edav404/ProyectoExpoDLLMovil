@@ -20,6 +20,13 @@ export interface Client {
   /** Fecha de nacimiento en formato AAAA-MM-DD */
   birthDate: string;
   email: string;
+  /** Cliente fijo para ventas sin registro. No se edita ni se elimina. */
+  isGuest?: boolean;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
 }
 
 export interface Product {
@@ -28,6 +35,7 @@ export interface Product {
   description: string;
   stock: number;
   unitPrice: number;
+  tagIds: string[];
 }
 
 export interface SaleHeader {
@@ -55,13 +63,14 @@ export interface Expense {
 }
 
 export interface AppData {
-  version: 3;
+  version: 4;
   users: User[];
   clients: Client[];
   products: Product[];
   saleHeaders: SaleHeader[];
   saleDetails: SaleDetail[];
   expenses: Expense[];
+  tags: Tag[];
 }
 
 export interface Session { userId: string }
@@ -87,5 +96,5 @@ export interface ClientInput {
   email: string;
 }
 
-export interface ProductInput { name: string; description: string; stock: number; unitPrice: number }
+export interface ProductInput { name: string; description: string; stock: number; unitPrice: number; tagIds?: string[] }
 export interface ExpenseInput { concept: string; category: ExpenseCategory; amount: number; date: string }

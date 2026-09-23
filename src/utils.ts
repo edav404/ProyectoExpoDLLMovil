@@ -1,4 +1,4 @@
-import type { ClientInput, ExpenseInput } from './types';
+import type { Client, ClientInput, ExpenseInput, Product, Role } from './types';
 
 export const normalizeEmail = (value: string) => value.trim().toLowerCase();
 export const normalizeText = (value: string) => value.trim().replace(/\s+/g, ' ');
@@ -42,6 +42,28 @@ export function validateExpense(input: ExpenseInput) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error('Usa una fecha válida en formato AAAA-MM-DD.');
   const date = new Date(`${input.date}T00:00:00`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== input.date || date > new Date()) throw new Error('La fecha debe ser válida y no futura.');
+}
+
+export function clientLabel(client?: Pick<Client, 'firstName' | 'lastName' | 'email' | 'isGuest'> | null) {
+  if (!client) return 'Sin seleccionar';
+  if (client.isGuest) return 'Cliente invitado';
+  const name = `${client.firstName} ${client.lastName}`.trim();
+  return name || client.email;
+}
+
+export function canSellForClient(role: Role, ownClientId: string | undefined, clientId: string) {
+  return role === 'admin' || ownClientId === clientId;
+}
+
+/** Varias etiquetas se combinan con OR. El texto se exige además de las etiquetas. */
+export function filterProducts(products: Product[], query: string, tagIds: string[]) {
+  const text = normalizeText(query).toLowerCase();
+  return products.filter((product) => {
+    const matchesText = !text || `${product.name} ${product.description}`.toLowerCase().includes(text);
+    const assigned = product.tagIds ?? [];
+    const matchesTags = tagIds.length === 0 || tagIds.some((tagId) => assigned.includes(tagId));
+    return matchesText && matchesTags;
+  });
 }
 
 export function calculateCartTotal(products: import('./types').Product[], lines: import('./types').CartLine[]) {

@@ -1,4 +1,4 @@
-import { calculateCartTotal, normalizeEmail, validateBirthDate, validatePassword, validateProduct } from '../utils';
+import { calculateCartTotal, canSellForClient, clientLabel, filterProducts, normalizeEmail, validateBirthDate, validatePassword, validateProduct } from '../utils';
 import type { Product } from '../types';
 
 describe('reglas de VentaLocal', () => {
@@ -24,9 +24,29 @@ describe('reglas de VentaLocal', () => {
 
   it('calcula el total de las líneas del carrito', () => {
     const products: Product[] = [
-      { id: 'a', name: 'A', description: 'A', stock: 5, unitPrice: 1200 },
-      { id: 'b', name: 'B', description: 'B', stock: 3, unitPrice: 2500 },
+      { id: 'a', name: 'A', description: 'A', stock: 5, unitPrice: 1200, tagIds: [] },
+      { id: 'b', name: 'B', description: 'B', stock: 3, unitPrice: 2500, tagIds: ['bebidas'] },
     ];
     expect(calculateCartTotal(products, [{ productId: 'a', quantity: 2 }, { productId: 'b', quantity: 1 }])).toBe(4900);
+  });
+
+  it('identifica al cliente invitado y limita la venta del rol cliente', () => {
+    expect(clientLabel({ firstName: 'Cliente', lastName: 'invitado', email: 'invitado@ventalocal.local', isGuest: true })).toBe('Cliente invitado');
+    expect(clientLabel(null)).toBe('Sin seleccionar');
+    expect(canSellForClient('admin', undefined, 'otro')).toBe(true);
+    expect(canSellForClient('client', 'propio', 'propio')).toBe(true);
+    expect(canSellForClient('client', 'propio', 'otro')).toBe(false);
+  });
+
+  it('filtra por texto y por una o varias etiquetas', () => {
+    const products: Product[] = [
+      { id: 'a', name: 'Jugo', description: 'Natural', stock: 2, unitPrice: 1000, tagIds: ['bebidas'] },
+      { id: 'b', name: 'Galletas', description: 'Dulces', stock: 2, unitPrice: 1000, tagIds: ['snacks'] },
+      { id: 'c', name: 'Combo', description: 'Jugo y galletas', stock: 2, unitPrice: 1000, tagIds: ['bebidas', 'snacks'] },
+    ];
+    expect(filterProducts(products, 'jugo', []).map((item) => item.id)).toEqual(['a', 'c']);
+    expect(filterProducts(products, '', ['bebidas', 'snacks']).map((item) => item.id)).toEqual(['a', 'b', 'c']);
+    expect(filterProducts(products, 'galletas', ['bebidas']).map((item) => item.id)).toEqual(['c']);
+    expect(filterProducts(products, 'galletas', ['hogar'])).toEqual([]);
   });
 });

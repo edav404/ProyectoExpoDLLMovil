@@ -3,13 +3,14 @@ import { reportHtml, saleHtml } from '../services/pdf';
 import type { AppData } from '../types';
 
 const data: AppData = {
-  version: 3,
+  version: 4,
   users: [],
   clients: [
     { id: 'c1', firstName: 'Ana', lastName: 'Torres', birthDate: '1990-01-01', email: 'ana@test.com' },
     { id: 'c2', firstName: 'Luis', lastName: 'Ríos', birthDate: '1990-01-01', email: 'luis@test.com' },
   ],
-  products: [{ id: 'p1', name: 'Café', description: 'Café', stock: 3, unitPrice: 5000 }],
+  products: [{ id: 'p1', name: 'Café', description: 'Café', stock: 3, unitPrice: 5000, tagIds: [] }],
+  tags: [],
   saleHeaders: [
     { id: 's1', clientId: 'c1', date: '2026-01-01T10:00:00.000Z', total: 10000 },
     { id: 's2', clientId: 'c2', date: '2026-01-31T10:00:00.000Z', total: 5000 },

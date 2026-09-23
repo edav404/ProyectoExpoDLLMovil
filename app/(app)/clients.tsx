@@ -6,7 +6,7 @@ import { Button, Card, Chip, EmptyState, Field, Header, IconButton, Screen } fro
 import { useApp } from '@/context/AppContext';
 import { colors, spacing } from '@/theme';
 import type { Client } from '@/types';
-import { formatDate } from '@/utils';
+import { clientLabel, formatDate } from '@/utils';
 
 export default function ClientsScreen() {
   const { data, user, saveClient, deleteClient } = useApp();
@@ -55,19 +55,19 @@ export default function ClientsScreen() {
               <View style={styles.rowBetween}>
                 <View style={styles.flex}>
                   {hasProfile
-                    ? <Text style={styles.name}>{client.firstName || ''} {client.lastName || ''}</Text>
+                    ? <Text style={styles.name}>{clientLabel(client)}</Text>
                     : <Text style={[styles.name, styles.incomplete]}>Sin nombre registrado</Text>}
-                  <Text style={styles.email}>{client.email}</Text>
+                  {client.isGuest ? null : <Text style={styles.email}>{client.email}</Text>}
                 </View>
-                {linked ? <Chip label="Con cuenta" tone="success" /> : <Chip label="Sin cuenta" />}
+                {client.isGuest ? <Chip label="Invitado" /> : linked ? <Chip label="Con cuenta" tone="success" /> : <Chip label="Sin cuenta" />}
               </View>
-              {client.birthDate
+              {client.isGuest ? <Text style={styles.meta}>Se usa en ventas sin registro y no se puede editar ni eliminar.</Text> : client.birthDate
                 ? <Text style={styles.meta}>Nacimiento: {formatDate(`${client.birthDate}T00:00:00`)}</Text>
                 : <Text style={[styles.meta, styles.incomplete]}>Fecha de nacimiento pendiente</Text>}
-              <View style={styles.actions}>
-                <IconButton icon="create-outline" label={`Editar ${client.firstName || client.email}`} onPress={() => setEditing(client)} />
-                <IconButton icon="trash-outline" label={`Eliminar ${client.firstName || client.email}`} danger onPress={() => remove(client)} />
-              </View>
+              {client.isGuest ? null : <View style={styles.actions}>
+                <IconButton icon="create-outline" label={`Editar ${clientLabel(client)}`} onPress={() => setEditing(client)} />
+                <IconButton icon="trash-outline" label={`Eliminar ${clientLabel(client)}`} danger onPress={() => remove(client)} />
+              </View>}
             </Card>
           );
         })}
@@ -85,7 +85,7 @@ function ClientModal({
 }: {
   client: Client | null;
   onClose: () => void;
-  onSave: (input: { firstName: string; lastName: string; birthDate: string; email: string }, id?: string) => Promise<void>;
+  onSave: (input: { firstName: string; lastName: string; birthDate: string; email: string }, id?: string) => Promise<Client>;
 }) {
   const initial = useMemo(() => ({
     firstName: client?.firstName ?? '',
@@ -111,7 +111,7 @@ function ClientModal({
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <Screen>
+      <Screen crumb={false}>
         <Header
           eyebrow={client ? 'Editar' : 'Nuevo'}
           title={client ? 'Editar cliente' : 'Crear cliente'}

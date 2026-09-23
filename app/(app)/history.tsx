@@ -5,7 +5,7 @@ import { Button, Card, EmptyState, Header, Screen } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
 import { colors, spacing } from '@/theme';
 import type { SaleHeader } from '@/types';
-import { formatDate, formatMoney } from '@/utils';
+import { clientLabel, formatDate, formatMoney } from '@/utils';
 import { exportSalePdf } from '@/services/pdf';
 import { router } from 'expo-router';
 
@@ -20,12 +20,12 @@ export default function HistoryScreen() {
   return (
     <Screen>
       <Header eyebrow="Movimientos" title={user.role === 'admin' ? 'Historial de ventas' : 'Mis compras'} subtitle="Las ventas confirmadas son inmutables." action={<Button title="Reporte" icon="bar-chart-outline" onPress={() => router.push('/(app)/reports')} />} />
-      {!sales.length ? <EmptyState icon="receipt-outline" title="Sin movimientos" message={user.role === 'admin' ? 'Las ventas confirmadas aparecerán aquí.' : 'Cuando realices una compra podrás consultar su detalle aquí.'} /> : sales.map((sale) => {
+      {!sales.length ? <EmptyState icon="receipt-outline" title="Sin movimientos" message={user.role === 'admin' ? 'Todavía no hay ventas. Puedes registrar la primera desde aquí.' : 'Todavía no tienes compras. Puedes hacer la primera desde aquí.'} action={<Button title={user.role === 'admin' ? 'Registrar venta' : 'Hacer una compra'} icon="add-circle-outline" onPress={() => router.push('/(app)/sale')} />} /> : sales.map((sale) => {
         const client = data.clients.find((item) => item.id === sale.clientId);
         const count = data.saleDetails.filter((detail) => detail.headerId === sale.id).reduce((sum, detail) => sum + detail.quantity, 0);
         return (
           <Card key={sale.id}>
-              <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.name}>{client ? `${client.firstName} ${client.lastName}`.trim() || client.email : 'Cliente'}</Text><Text style={styles.muted}>{formatDate(sale.date)} · {count} artículo(s)</Text></View><Text style={styles.total}>{formatMoney(sale.total)}</Text></View>
+              <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.name}>{client ? clientLabel(client) : 'Cliente'}</Text><Text style={styles.muted}>{formatDate(sale.date)} · {count} artículo(s)</Text></View><Text style={styles.total}>{formatMoney(sale.total)}</Text></View>
               <View style={styles.cardActions}><Button title="Ver detalle" variant="ghost" onPress={() => setSelected(sale)} /><Button title="PDF" icon="document-text-outline" variant="ghost" loading={exporting === sale.id} onPress={() => { setExporting(sale.id); void exportSalePdf(data, sale).then(() => Alert.alert('Comprobante listo', 'El PDF está disponible para guardar o compartir.')).catch((error) => Alert.alert('No se pudo exportar', error instanceof Error ? error.message : 'Intenta nuevamente.')).finally(() => setExporting(null)); }} /></View>
             </Card>
         );
@@ -42,9 +42,9 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleHeader | null; onClose: 
   const details = data.saleDetails.filter((item) => item.headerId === sale.id);
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <Screen>
+      <Screen crumb={false}>
         <Header eyebrow="Comprobante local" title="Detalle de venta" subtitle={`Registrada el ${formatDate(sale.date)}`} />
-        <Card><Text style={styles.label}>Cliente</Text><Text style={styles.name}>{client ? (`${client.firstName} ${client.lastName}`.trim() || client.email) : 'No disponible'}</Text><Text style={styles.muted}>{client?.email}</Text></Card>
+        <Card><Text style={styles.label}>Cliente</Text><Text style={styles.name}>{client ? clientLabel(client) : 'No disponible'}</Text>{client && !client.isGuest ? <Text style={styles.muted}>{client.email}</Text> : null}</Card>
         <Card>
           <Text style={styles.label}>Productos</Text>
           {details.map((detail) => {

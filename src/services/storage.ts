@@ -16,6 +16,7 @@ import type {
   Role,
   SaleHeader,
   Session,
+  Tag,
   User,
 } from '../types';
 import {
@@ -27,12 +28,38 @@ import {
   validatePassword,
   validateProduct,
 } from '../utils';
+import { SCHEMA, loadSnapshot, openAppDatabase, saveSnapshot, type SqlDatabase } from './database';
 
 const DATA_KEY = 'ventalocal:data:v1';
 // SecureStore solo permite letras, números, puntos, guiones y guiones bajos.
 const SESSION_KEY = 'ventalocal.session';
+
+/** En web el módulo nativo llega vacío y getItemAsync lanza. Ahí la sesión va a AsyncStorage. */
+async function secureStoreAvailable() {
+  try {
+    return typeof SecureStore.isAvailableAsync === 'function' && await SecureStore.isAvailableAsync();
+  } catch {
+    return false;
+  }
+}
+
+async function readSessionRaw() {
+  if (await secureStoreAvailable()) return SecureStore.getItemAsync(SESSION_KEY);
+  return AsyncStorage.getItem(SESSION_KEY);
+}
+
+async function writeSessionRaw(value: string | null) {
+  if (await secureStoreAvailable()) {
+    if (value) await SecureStore.setItemAsync(SESSION_KEY, value);
+    else await SecureStore.deleteItemAsync(SESSION_KEY);
+    return;
+  }
+  if (value) await AsyncStorage.setItem(SESSION_KEY, value);
+  else await AsyncStorage.removeItem(SESSION_KEY);
+}
 const ADMIN_EMAIL = 'admin@demo.com';
 const ADMIN_PASSWORD = 'Admin123*';
+const GUEST_EMAIL = 'invitado@ventalocal.local';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const id = () => Crypto.randomUUID();
@@ -47,37 +74,47 @@ async function passwordRecord(password: string) {
   return { passwordSalt: salt, passwordHash: await hashPassword(password, salt) };
 }
 
+function guestClient(): Client {
+  return { id: id(), firstName: 'Cliente', lastName: 'invitado', birthDate: '', email: GUEST_EMAIL, isGuest: true };
+}
+
+function ensureGuest(data: AppData): AppData {
+  if (data.clients.some((client) => client.isGuest)) return data;
+  return { ...data, clients: [...data.clients, guestClient()] };
+}
+
 async function createSeedData(): Promise<AppData> {
   const password = await passwordRecord(ADMIN_PASSWORD);
-  return {
-    version: 3,
+  return ensureGuest({
+    version: 4,
     users: [{ id: id(), email: ADMIN_EMAIL, role: 'admin', status: 'active', createdAt: new Date().toISOString(), ...password }],
     clients: [],
     products: [],
     saleHeaders: [],
     saleDetails: [],
     expenses: [],
-  };
+    tags: [],
+  });
 }
 
 function isAppData(value: unknown): value is AppData {
   if (!value || typeof value !== 'object') return false;
   const data = value as Partial<AppData>;
-  return data.version === 3 && ['users', 'clients', 'products', 'saleHeaders', 'saleDetails', 'expenses'].every(
+  return data.version === 4 && ['users', 'clients', 'products', 'saleHeaders', 'saleDetails', 'expenses', 'tags'].every(
     (key) => Array.isArray(data[key as keyof AppData]),
   );
 }
 
 function migrateAppData(value: unknown): AppData | null {
-  if (isAppData(value)) return value;
+  if (isAppData(value)) return ensureGuest(value);
   if (!value || typeof value !== 'object') return null;
   const legacy = value as Omit<Partial<AppData>, 'version'> & { version?: number };
-  if (legacy.version !== undefined && legacy.version !== 0 && legacy.version !== 1 && legacy.version !== 2) return null;
+  if (legacy.version !== undefined && legacy.version !== 0 && legacy.version !== 1 && legacy.version !== 2 && legacy.version !== 3) return null;
   if (!['users', 'clients', 'products', 'saleHeaders', 'saleDetails'].every(
     (key) => Array.isArray(legacy[key as keyof AppData]),
   )) return null;
-  return {
-    version: 3,
+  return ensureGuest({
+    version: 4,
     users: (legacy.users ?? []).map((u) => ({ ...u, status: (u as User & { status?: string }).status ?? 'active' as const })),
     clients: (legacy.clients ?? []).map((c) => {
       const legacyClient = c as Client & { name?: string };
@@ -87,37 +124,67 @@ function migrateAppData(value: unknown): AppData | null {
         lastName: legacyClient.lastName ?? '',
         birthDate: legacyClient.birthDate ?? '',
         email: legacyClient.email ?? '',
+        isGuest: legacyClient.isGuest,
       };
     }),
-    products: legacy.products!,
+    products: (legacy.products ?? []).map((product) => ({ ...product, tagIds: product.tagIds ?? [] })),
     saleHeaders: legacy.saleHeaders!,
     saleDetails: legacy.saleDetails!,
     expenses: (legacy as Partial<AppData>).expenses ?? [],
-  };
+    tags: (legacy as Partial<AppData>).tags ?? [],
+  });
 }
 
 export class LocalStore {
   private data: AppData | null = null;
   private queue: Promise<unknown> = Promise.resolve();
+  private sql: SqlDatabase | null;
+  private schemaReady = false;
+
+  constructor(database?: SqlDatabase) {
+    this.sql = database ?? null;
+  }
+
+  private async connection() {
+    if (!this.sql) this.sql = await openAppDatabase();
+    if (!this.schemaReady) {
+      await this.sql.exec(SCHEMA);
+      this.schemaReady = true;
+    }
+    return this.sql;
+  }
+
+  private async importLegacy(db: SqlDatabase): Promise<AppData | null> {
+    const raw = await AsyncStorage.getItem(DATA_KEY);
+    if (!raw) return null;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    const migrated = migrateAppData(parsed);
+    if (!migrated) return null;
+    await saveSnapshot(db, migrated);
+    await AsyncStorage.removeItem(DATA_KEY);
+    return migrated;
+  }
 
   async initialize() {
     if (this.data) return clone(this.data);
-    const raw = await AsyncStorage.getItem(DATA_KEY);
-    if (raw) {
-      try {
-        const parsed: unknown = JSON.parse(raw);
-        const migrated = migrateAppData(parsed);
-        if (migrated) {
-          this.data = migrated;
-          if (!isAppData(parsed)) await AsyncStorage.setItem(DATA_KEY, JSON.stringify(migrated));
-          return clone(migrated);
-        }
-      } catch {
-        // Un documento corrupto se reemplaza con el seed vacío a continuación.
-      }
+    const db = await this.connection();
+    const existing = await loadSnapshot(db);
+    if (existing) {
+      this.data = existing;
+      return clone(existing);
+    }
+    const imported = await this.importLegacy(db);
+    if (imported) {
+      this.data = imported;
+      return clone(imported);
     }
     this.data = await createSeedData();
-    await AsyncStorage.setItem(DATA_KEY, JSON.stringify(this.data));
+    await saveSnapshot(db, this.data);
     return clone(this.data);
   }
 
@@ -132,7 +199,7 @@ export class LocalStore {
       if (!this.data) await this.initialize();
       const draft = clone(this.data!);
       result = await mutator(draft);
-      await AsyncStorage.setItem(DATA_KEY, JSON.stringify(draft));
+      await saveSnapshot(await this.connection(), draft);
       this.data = draft;
     });
     this.queue = operation.catch(() => undefined);
@@ -141,22 +208,21 @@ export class LocalStore {
   }
 
   async getSession() {
-    const raw = await SecureStore.getItemAsync(SESSION_KEY);
+    const raw = await readSessionRaw();
     if (!raw) return null;
     try {
       const session = JSON.parse(raw) as Session;
       if (this.data?.users.some((user) => user.id === session.userId)) return session;
-      await SecureStore.deleteItemAsync(SESSION_KEY);
+      await writeSessionRaw(null);
       return null;
     } catch {
-      await SecureStore.deleteItemAsync(SESSION_KEY);
+      await writeSessionRaw(null);
       return null;
     }
   }
 
   async setSession(userId: string | null) {
-    if (userId) await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ userId } satisfies Session));
-    else await SecureStore.deleteItemAsync(SESSION_KEY);
+    await writeSessionRaw(userId ? JSON.stringify({ userId } satisfies Session) : null);
   }
 
   async login(email: string, password: string) {
@@ -183,7 +249,7 @@ export class LocalStore {
     }
     const password = await passwordRecord(input.password);
     await this.update<User>((draft) => {
-      if (draft.users.some((item) => item.email === email) || draft.clients.some((item) => item.email === email)) {
+      if (email === GUEST_EMAIL || draft.users.some((item) => item.email === email) || draft.clients.some((item) => item.email === email)) {
         throw new Error('Este correo ya está registrado.');
       }
       const created: User = {
@@ -230,7 +296,10 @@ export class LocalStore {
   async saveClient(input: ClientInput, clientId?: string) {
     validateClient(input);
     const email = normalizeEmail(input.email);
+    if (email === GUEST_EMAIL) throw new Error('Este correo está reservado.');
     return this.update<Client>((draft) => {
+      const current = clientId ? draft.clients.find((item) => item.id === clientId) : undefined;
+      if (clientId && current?.isGuest) throw new Error('El cliente invitado no se puede editar.');
       const duplicateClient = draft.clients.some((item) => item.email === email && item.id !== clientId);
       const linkedUser = clientId ? draft.users.find((item) => item.clientId === clientId) : undefined;
       const duplicateUser = draft.users.some((item) => item.email === email && item.id !== linkedUser?.id);
@@ -246,9 +315,9 @@ export class LocalStore {
         draft.clients.push(created);
         return created;
       }
+      if (!current) throw new Error('Cliente no encontrado.');
       const index = draft.clients.findIndex((item) => item.id === clientId);
-      if (index < 0) throw new Error('Cliente no encontrado.');
-      draft.clients[index] = { id: clientId, ...payload };
+      draft.clients[index] = { id: clientId, ...payload, isGuest: current.isGuest };
       if (linkedUser) linkedUser.email = email;
       return draft.clients[index];
     });
@@ -256,6 +325,8 @@ export class LocalStore {
 
   async deleteClient(clientId: string) {
     return this.update<void>((draft) => {
+      const client = draft.clients.find((item) => item.id === clientId);
+      if (client?.isGuest) throw new Error('No se puede eliminar el cliente invitado.');
       if (draft.saleHeaders.some((sale) => sale.clientId === clientId)) {
         throw new Error('No se puede eliminar: el cliente tiene ventas registradas.');
       }
@@ -273,7 +344,9 @@ export class LocalStore {
       if (draft.products.some((item) => item.name.toLowerCase() === normalizedName.toLowerCase() && item.id !== productId)) {
         throw new Error('Ya existe un producto con este nombre.');
       }
-      const payload = { ...input, name: normalizedName, description: normalizeText(input.description) };
+      const tagIds = [...new Set(input.tagIds ?? [])];
+      if (tagIds.some((tagId) => !draft.tags.some((tag) => tag.id === tagId))) throw new Error('Una de las etiquetas ya no existe.');
+      const payload = { name: normalizedName, description: normalizeText(input.description), stock: input.stock, unitPrice: input.unitPrice, tagIds };
       if (!productId) {
         const created = { id: id(), ...payload };
         draft.products.push(created);
@@ -292,6 +365,35 @@ export class LocalStore {
         throw new Error('No se puede eliminar: el producto aparece en el historial de ventas.');
       }
       draft.products = draft.products.filter((item) => item.id !== productId);
+    });
+  }
+
+  async saveTag(name: string, tagId?: string) {
+    const normalized = normalizeText(name);
+    if (normalized.length < 2) throw new Error('La etiqueta debe tener al menos 2 caracteres.');
+    return this.update<Tag>((draft) => {
+      if (draft.tags.some((tag) => tag.name.toLowerCase() === normalized.toLowerCase() && tag.id !== tagId)) {
+        throw new Error('Ya existe una etiqueta con este nombre.');
+      }
+      if (!tagId) {
+        const created = { id: id(), name: normalized };
+        draft.tags.push(created);
+        return created;
+      }
+      const index = draft.tags.findIndex((tag) => tag.id === tagId);
+      if (index < 0) throw new Error('Etiqueta no encontrada.');
+      draft.tags[index] = { id: tagId, name: normalized };
+      return draft.tags[index];
+    });
+  }
+
+  async deleteTag(tagId: string) {
+    return this.update<void>((draft) => {
+      if (!draft.tags.some((tag) => tag.id === tagId)) throw new Error('Etiqueta no encontrada.');
+      draft.tags = draft.tags.filter((tag) => tag.id !== tagId);
+      draft.products.forEach((product) => {
+        product.tagIds = product.tagIds.filter((assigned) => assigned !== tagId);
+      });
     });
   }
 
@@ -343,7 +445,7 @@ export class LocalStore {
 
   async reset() {
     const seed = await createSeedData();
-    await AsyncStorage.setItem(DATA_KEY, JSON.stringify(seed));
+    await saveSnapshot(await this.connection(), seed);
     this.data = seed;
     await this.setSession(null);
     return clone(seed);

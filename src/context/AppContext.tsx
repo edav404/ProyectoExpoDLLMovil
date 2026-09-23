@@ -1,7 +1,8 @@
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { localStore } from '../services/storage';
-import type { ActivateUserInput, AppData, CartLine, ClientInput, ExpenseInput, ProductInput, RegisterInput, User } from '../types';
+import type { ActivateUserInput, AppData, CartLine, Client, ClientInput, ExpenseInput, Product, ProductInput, RegisterInput, Tag, User } from '../types';
+import { canSellForClient } from '../utils';
 
 interface AppContextValue {
   ready: boolean;
@@ -11,10 +12,12 @@ interface AppContextValue {
   register(input: RegisterInput): Promise<void>;
   logout(): Promise<void>;
   activateUser(input: ActivateUserInput): Promise<void>;
-  saveClient(input: ClientInput, id?: string): Promise<void>;
+  saveClient(input: ClientInput, id?: string): Promise<Client>;
   deleteClient(id: string): Promise<void>;
-  saveProduct(input: ProductInput, id?: string): Promise<void>;
+  saveProduct(input: ProductInput, id?: string): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
+  saveTag(name: string, id?: string): Promise<Tag>;
+  deleteTag(id: string): Promise<void>;
   saveExpense(input: ExpenseInput, id?: string): Promise<void>;
   deleteExpense(id: string): Promise<void>;
   createSale(clientId: string, lines: CartLine[]): Promise<string>;
@@ -70,7 +73,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     },
     saveClient: async (input, id) => {
       if (activeUser?.role !== 'admin' && (!id || activeUser?.clientId !== id)) throw new Error('No tienes permiso para editar este cliente.');
-      await localStore.saveClient(input, id); sync();
+      const saved = await localStore.saveClient(input, id); sync(); return saved;
     },
     deleteClient: async (id) => {
       if (activeUser?.role !== 'admin') throw new Error('No tienes permiso para realizar esta acción.');
@@ -78,11 +81,19 @@ export function AppProvider({ children }: PropsWithChildren) {
     },
     saveProduct: async (input, id) => {
       if (activeUser?.role !== 'admin') throw new Error('No tienes permiso para realizar esta acción.');
-      await localStore.saveProduct(input, id); sync();
+      const saved = await localStore.saveProduct(input, id); sync(); return saved;
     },
     deleteProduct: async (id) => {
       if (activeUser?.role !== 'admin') throw new Error('No tienes permiso para realizar esta acción.');
       await localStore.deleteProduct(id); sync();
+    },
+    saveTag: async (name, id) => {
+      if (activeUser?.role !== 'admin') throw new Error('No tienes permiso para realizar esta acción.');
+      const saved = await localStore.saveTag(name, id); sync(); return saved;
+    },
+    deleteTag: async (id) => {
+      if (activeUser?.role !== 'admin') throw new Error('No tienes permiso para realizar esta acción.');
+      await localStore.deleteTag(id); sync();
     },
     saveExpense: async (input, id) => {
       if (activeUser?.role !== 'admin') throw new Error('Solo un administrador puede gestionar egresos.');
@@ -94,7 +105,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     },
     createSale: async (clientId, lines) => {
       if (!activeUser) throw new Error('Tu sesión ya no está disponible.');
-      if (activeUser.role === 'client' && activeUser.clientId !== clientId) throw new Error('No puedes registrar ventas para otro cliente.');
+      if (!canSellForClient(activeUser.role, activeUser.clientId, clientId)) throw new Error('No puedes registrar ventas para otro cliente.');
       const sale = await localStore.createSale(clientId, lines); sync(); return sale.id;
     },
     reset: async () => {

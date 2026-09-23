@@ -1,4 +1,5 @@
 import type { AppData, Expense, SaleHeader } from '../types';
+import { clientLabel } from '../utils';
 
 export interface ReportFilters { from: string; to: string; clientId?: string }
 export interface ProductReportRow { productId: string; name: string; quantity: number; revenue: number }
@@ -40,7 +41,7 @@ export function buildReport(data: AppData, filters: ReportFilters): ReportModel 
   const clients = new Map<string, ClientReportRow>();
   sales.forEach((sale) => {
     const client = data.clients.find((item) => item.id === sale.clientId);
-    const row = clients.get(sale.clientId) ?? { clientId: sale.clientId, name: client ? `${client.firstName} ${client.lastName}`.trim() || client.email : 'Cliente', sales: 0, revenue: 0 };
+    const row = clients.get(sale.clientId) ?? { clientId: sale.clientId, name: client ? clientLabel(client) : 'Cliente', sales: 0, revenue: 0 };
     row.sales += 1; row.revenue += sale.total; clients.set(sale.clientId, row);
   });
   const expensesTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0);

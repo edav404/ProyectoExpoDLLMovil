@@ -114,7 +114,7 @@ function ActivateModal({
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <Screen>
+      <Screen crumb={false}>
         <Header
           eyebrow="Activar cuenta"
           title="Asignar rol"
