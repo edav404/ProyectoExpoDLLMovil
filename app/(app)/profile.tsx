@@ -89,8 +89,8 @@ function ProfileEditor({
   client: Client;
   saveClient: ReturnType<typeof useApp>['saveClient'];
 }) {
-  const [firstName, setFirstName] = useState(client.firstName);
-  const [lastName, setLastName] = useState(client.lastName);
+  const [firstName, setFirstName] = useState(client.firstName || '');
+  const [lastName, setLastName] = useState(client.lastName || '');
   const [birthDate, setBirthDate] = useState(client.birthDate);
   const [email, setEmail] = useState(client.email);
   const [loading, setLoading] = useState(false);

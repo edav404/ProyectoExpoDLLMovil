@@ -1,7 +1,7 @@
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { localStore } from '../services/storage';
-import type { ActivateUserInput, AppData, CartLine, ClientInput, ProductInput, RegisterInput, User } from '../types';
+import type { ActivateUserInput, AppData, CartLine, ClientInput, ExpenseInput, ProductInput, RegisterInput, User } from '../types';
 
 interface AppContextValue {
   ready: boolean;
@@ -15,6 +15,8 @@ interface AppContextValue {
   deleteClient(id: string): Promise<void>;
   saveProduct(input: ProductInput, id?: string): Promise<void>;
   deleteProduct(id: string): Promise<void>;
+  saveExpense(input: ExpenseInput, id?: string): Promise<void>;
+  deleteExpense(id: string): Promise<void>;
   createSale(clientId: string, lines: CartLine[]): Promise<string>;
   reset(): Promise<void>;
 }
@@ -81,6 +83,14 @@ export function AppProvider({ children }: PropsWithChildren) {
     deleteProduct: async (id) => {
       if (activeUser?.role !== 'admin') throw new Error('No tienes permiso para realizar esta acción.');
       await localStore.deleteProduct(id); sync();
+    },
+    saveExpense: async (input, id) => {
+      if (activeUser?.role !== 'admin') throw new Error('Solo un administrador puede gestionar egresos.');
+      await localStore.saveExpense(input, id); sync();
+    },
+    deleteExpense: async (id) => {
+      if (activeUser?.role !== 'admin') throw new Error('Solo un administrador puede gestionar egresos.');
+      await localStore.deleteExpense(id); sync();
     },
     createSale: async (clientId, lines) => {
       if (!activeUser) throw new Error('Tu sesión ya no está disponible.');

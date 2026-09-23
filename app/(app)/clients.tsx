@@ -16,13 +16,13 @@ export default function ClientsScreen() {
   if (user.role !== 'admin') return <Redirect href="/(app)/dashboard" />;
 
   const filtered = data.clients.filter((client) => {
-    const fullName = `${client.firstName} ${client.lastName}`;
+    const fullName = `${client.firstName || ''} ${client.lastName || ''}`;
     return `${fullName} ${client.email}`.toLowerCase().includes(search.trim().toLowerCase());
   });
 
   const remove = (client: Client) => Alert.alert(
     'Eliminar cliente',
-    `¿Quieres eliminar a ${client.firstName} ${client.lastName}?`,
+    `¿Quieres eliminar a ${client.firstName || ''} ${client.lastName || ''}?`.trim(),
     [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -49,13 +49,13 @@ export default function ClientsScreen() {
         />
         : filtered.map((client) => {
           const linked = data.users.some((item) => item.clientId === client.id);
-          const hasProfile = client.firstName.length > 0 && client.lastName.length > 0;
+          const hasProfile = (client.firstName || '').length > 0 && (client.lastName || '').length > 0;
           return (
             <Card key={client.id}>
               <View style={styles.rowBetween}>
                 <View style={styles.flex}>
                   {hasProfile
-                    ? <Text style={styles.name}>{client.firstName} {client.lastName}</Text>
+                    ? <Text style={styles.name}>{client.firstName || ''} {client.lastName || ''}</Text>
                     : <Text style={[styles.name, styles.incomplete]}>Sin nombre registrado</Text>}
                   <Text style={styles.email}>{client.email}</Text>
                 </View>

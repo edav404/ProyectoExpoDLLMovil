@@ -8,6 +8,8 @@ import type {
   CartLine,
   Client,
   ClientInput,
+  Expense,
+  ExpenseInput,
   Product,
   ProductInput,
   RegisterInput,
@@ -21,6 +23,7 @@ import {
   normalizeText,
   validateClient,
   validateEmail,
+  validateExpense,
   validatePassword,
   validateProduct,
 } from '../utils';
@@ -47,19 +50,20 @@ async function passwordRecord(password: string) {
 async function createSeedData(): Promise<AppData> {
   const password = await passwordRecord(ADMIN_PASSWORD);
   return {
-    version: 1,
+    version: 3,
     users: [{ id: id(), email: ADMIN_EMAIL, role: 'admin', status: 'active', createdAt: new Date().toISOString(), ...password }],
     clients: [],
     products: [],
     saleHeaders: [],
     saleDetails: [],
+    expenses: [],
   };
 }
 
 function isAppData(value: unknown): value is AppData {
   if (!value || typeof value !== 'object') return false;
   const data = value as Partial<AppData>;
-  return data.version === 1 && ['users', 'clients', 'products', 'saleHeaders', 'saleDetails'].every(
+  return data.version === 3 && ['users', 'clients', 'products', 'saleHeaders', 'saleDetails', 'expenses'].every(
     (key) => Array.isArray(data[key as keyof AppData]),
   );
 }
@@ -68,12 +72,12 @@ function migrateAppData(value: unknown): AppData | null {
   if (isAppData(value)) return value;
   if (!value || typeof value !== 'object') return null;
   const legacy = value as Omit<Partial<AppData>, 'version'> & { version?: number };
-  if (legacy.version !== undefined && legacy.version !== 0) return null;
+  if (legacy.version !== undefined && legacy.version !== 0 && legacy.version !== 1 && legacy.version !== 2) return null;
   if (!['users', 'clients', 'products', 'saleHeaders', 'saleDetails'].every(
     (key) => Array.isArray(legacy[key as keyof AppData]),
   )) return null;
   return {
-    version: 1,
+    version: 3,
     users: (legacy.users ?? []).map((u) => ({ ...u, status: (u as User & { status?: string }).status ?? 'active' as const })),
     clients: (legacy.clients ?? []).map((c) => {
       const legacyClient = c as Client & { name?: string };
@@ -88,6 +92,7 @@ function migrateAppData(value: unknown): AppData | null {
     products: legacy.products!,
     saleHeaders: legacy.saleHeaders!,
     saleDetails: legacy.saleDetails!,
+    expenses: (legacy as Partial<AppData>).expenses ?? [],
   };
 }
 
@@ -287,6 +292,29 @@ export class LocalStore {
         throw new Error('No se puede eliminar: el producto aparece en el historial de ventas.');
       }
       draft.products = draft.products.filter((item) => item.id !== productId);
+    });
+  }
+
+  async saveExpense(input: ExpenseInput, expenseId?: string) {
+    validateExpense(input);
+    return this.update<Expense>((draft) => {
+      const payload = { concept: normalizeText(input.concept), category: input.category, amount: input.amount, date: input.date };
+      if (!expenseId) {
+        const created = { id: id(), ...payload, createdAt: new Date().toISOString() };
+        draft.expenses.push(created);
+        return created;
+      }
+      const index = draft.expenses.findIndex((expense) => expense.id === expenseId);
+      if (index < 0) throw new Error('Egreso no encontrado.');
+      draft.expenses[index] = { ...draft.expenses[index], ...payload };
+      return draft.expenses[index];
+    });
+  }
+
+  async deleteExpense(expenseId: string) {
+    return this.update<void>((draft) => {
+      if (!draft.expenses.some((expense) => expense.id === expenseId)) throw new Error('Egreso no encontrado.');
+      draft.expenses = draft.expenses.filter((expense) => expense.id !== expenseId);
     });
   }
 

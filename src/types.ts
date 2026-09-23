@@ -1,5 +1,6 @@
 export type Role = 'admin' | 'client';
 export type UserStatus = 'pending' | 'active';
+export type ExpenseCategory = 'Operativo' | 'Inventario' | 'Transporte' | 'Servicios' | 'Otro';
 
 export interface User {
   id: string;
@@ -44,13 +45,23 @@ export interface SaleDetail {
   subtotal: number;
 }
 
+export interface Expense {
+  id: string;
+  concept: string;
+  category: ExpenseCategory;
+  amount: number;
+  date: string;
+  createdAt: string;
+}
+
 export interface AppData {
-  version: 1;
+  version: 3;
   users: User[];
   clients: Client[];
   products: Product[];
   saleHeaders: SaleHeader[];
   saleDetails: SaleDetail[];
+  expenses: Expense[];
 }
 
 export interface Session { userId: string }
@@ -77,3 +88,4 @@ export interface ClientInput {
 }
 
 export interface ProductInput { name: string; description: string; stock: number; unitPrice: number }
+export interface ExpenseInput { concept: string; category: ExpenseCategory; amount: number; date: string }

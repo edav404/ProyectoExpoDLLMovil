@@ -1,32 +1,33 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, EmptyState, Header, Screen } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
 import { colors, spacing } from '@/theme';
 import type { SaleHeader } from '@/types';
 import { formatDate, formatMoney } from '@/utils';
+import { exportSalePdf } from '@/services/pdf';
+import { router } from 'expo-router';
 
 export default function HistoryScreen() {
   const { data, user } = useApp();
   const [selected, setSelected] = useState<SaleHeader | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
   if (!data || !user) return null;
   const sales = data.saleHeaders
     .filter((sale) => user.role === 'admin' || sale.clientId === user.clientId)
     .sort((a, b) => b.date.localeCompare(a.date));
   return (
     <Screen>
-      <Header eyebrow="Movimientos" title={user.role === 'admin' ? 'Historial de ventas' : 'Mis compras'} subtitle="Las ventas confirmadas son inmutables." />
+      <Header eyebrow="Movimientos" title={user.role === 'admin' ? 'Historial de ventas' : 'Mis compras'} subtitle="Las ventas confirmadas son inmutables." action={<Button title="Reporte" icon="bar-chart-outline" onPress={() => router.push('/(app)/reports')} />} />
       {!sales.length ? <EmptyState icon="receipt-outline" title="Sin movimientos" message={user.role === 'admin' ? 'Las ventas confirmadas aparecerán aquí.' : 'Cuando realices una compra podrás consultar su detalle aquí.'} /> : sales.map((sale) => {
         const client = data.clients.find((item) => item.id === sale.clientId);
         const count = data.saleDetails.filter((detail) => detail.headerId === sale.id).reduce((sum, detail) => sum + detail.quantity, 0);
         return (
-          <Pressable key={sale.id} accessibilityRole="button" accessibilityLabel={`Ver venta de ${formatMoney(sale.total)}`} onPress={() => setSelected(sale)}>
-            <Card>
+          <Card key={sale.id}>
               <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.name}>{client ? `${client.firstName} ${client.lastName}`.trim() || client.email : 'Cliente'}</Text><Text style={styles.muted}>{formatDate(sale.date)} · {count} artículo(s)</Text></View><Text style={styles.total}>{formatMoney(sale.total)}</Text></View>
-              <Text style={styles.link}>Ver detalle →</Text>
+              <View style={styles.cardActions}><Button title="Ver detalle" variant="ghost" onPress={() => setSelected(sale)} /><Button title="PDF" icon="document-text-outline" variant="ghost" loading={exporting === sale.id} onPress={() => { setExporting(sale.id); void exportSalePdf(data, sale).then(() => Alert.alert('Comprobante listo', 'El PDF está disponible para guardar o compartir.')).catch((error) => Alert.alert('No se pudo exportar', error instanceof Error ? error.message : 'Intenta nuevamente.')).finally(() => setExporting(null)); }} /></View>
             </Card>
-          </Pressable>
         );
       })}
       <SaleDetailModal sale={selected} onClose={() => setSelected(null)} />
@@ -60,9 +61,8 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleHeader | null; onClose: 
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md }, name: { color: colors.text, fontWeight: '800', fontSize: 16 },
+  flex: { flex: 1 }, rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md }, cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, name: { color: colors.text, fontWeight: '800', fontSize: 16 },
   muted: { color: colors.muted, marginTop: 3 }, total: { color: colors.primary, fontWeight: '900', fontSize: 17 }, link: { color: colors.primary, fontWeight: '700', marginTop: spacing.xs },
   label: { color: colors.muted, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }, detailLine: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm, borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
   price: { color: colors.text, fontWeight: '800' }, divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm }, totalLabel: { color: colors.text, fontWeight: '900', fontSize: 18 }, bigTotal: { color: colors.primary, fontWeight: '900', fontSize: 22 }, id: { color: colors.muted, fontSize: 11, textAlign: 'center' },
 });
-

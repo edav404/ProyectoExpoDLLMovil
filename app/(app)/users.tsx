@@ -2,7 +2,7 @@ import { Redirect } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, Chip, EmptyState, Header, IconButton, Screen } from '@/components/ui';
+import { Button, Card, Chip, EmptyState, Header, Screen } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
 import { colors, radii, spacing } from '@/theme';
 import type { Role, User } from '@/types';

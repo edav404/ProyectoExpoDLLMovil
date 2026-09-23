@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, router } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -13,7 +14,7 @@ export default function WelcomeScreen() {
   return (
     <Screen>
       <View style={styles.hero}>
-        <View style={styles.logo}><Ionicons name="storefront" size={42} color={colors.white} /></View>
+        <LinearGradient colors={[colors.primary, colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logo}><Ionicons name="storefront" size={42} color={colors.white} /></LinearGradient>
         <Text style={styles.brand}>VentaLocal</Text>
         <Text style={styles.title}>Tu negocio, organizado en un solo lugar.</Text>
         <Text style={styles.copy}>Administra clientes, inventario y ventas desde tu dispositivo, incluso sin conexión.</Text>
@@ -30,11 +31,10 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   hero: { flex: 1, justifyContent: 'center', gap: spacing.md },
-  logo: { width: 78, height: 78, borderRadius: radii.lg, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  logo: { width: 78, height: 78, borderRadius: radii.lg, alignItems: 'center', justifyContent: 'center' },
   brand: { color: colors.primary, fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
   title: { color: colors.text, fontSize: 38, lineHeight: 44, fontWeight: '900' },
   copy: { color: colors.muted, fontSize: 17, lineHeight: 25 },
   actions: { gap: spacing.sm },
   offline: { color: colors.muted, textAlign: 'center', fontSize: 13, marginTop: spacing.sm },
 });
-

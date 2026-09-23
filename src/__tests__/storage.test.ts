@@ -53,8 +53,9 @@ describe('LocalStore', () => {
     values.set('ventalocal:data:v1', JSON.stringify({ version: 0, users: [], clients: [], products: [], saleHeaders: [], saleDetails: [] }));
     const store = new LocalStore();
     const data = await store.initialize();
-    expect(data.version).toBe(1);
-    expect(JSON.parse(values.get('ventalocal:data:v1')!).version).toBe(1);
+    expect(data.version).toBe(3);
+    expect(data.expenses).toEqual([]);
+    expect(JSON.parse(values.get('ventalocal:data:v1')!).version).toBe(3);
   });
 
   it('crea usuario en estado pendiente al registrarse (sin auto-login)', async () => {
@@ -101,5 +102,18 @@ describe('LocalStore', () => {
     await store.createSale(client.id, [{ productId: product.id, quantity: 1 }]);
     await expect(store.deleteClient(client.id)).rejects.toThrow('ventas registradas');
     await expect(store.deleteProduct(product.id)).rejects.toThrow('historial de ventas');
+  });
+
+  it('crea, actualiza y elimina egresos con validaciones', async () => {
+    const store = new LocalStore();
+    await store.initialize();
+    const expense = await store.saveExpense({ concept: 'Transporte', category: 'Transporte', amount: 12000, date: '2026-01-10' });
+    expect(store.snapshot().expenses[0]).toMatchObject({ concept: 'Transporte', amount: 12000 });
+    await store.saveExpense({ concept: 'Transporte urbano', category: 'Operativo', amount: 15000, date: '2026-01-11' }, expense.id);
+    expect(store.snapshot().expenses[0]).toMatchObject({ category: 'Operativo', amount: 15000 });
+    await expect(store.saveExpense({ concept: 'Prueba', category: 'Otro', amount: -1, date: '2026-01-10' })).rejects.toThrow('monto');
+    await expect(store.saveExpense({ concept: 'Futuro', category: 'Otro', amount: 1, date: '2099-01-01' })).rejects.toThrow('futura');
+    await store.deleteExpense(expense.id);
+    expect(store.snapshot().expenses).toHaveLength(0);
   });
 });

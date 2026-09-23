@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, Chip, EmptyState, Field, Header, IconButton, Screen } from '@/components/ui';
+import { BottomSheet, Button, Card, Chip, EmptyState, Field, Header, IconButton, Screen } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
 import { colors, spacing } from '@/theme';
 import type { Product } from '@/types';
@@ -22,9 +22,10 @@ export default function ProductsScreen() {
     <Screen>
       <Header eyebrow={admin ? 'Inventario' : 'Tienda'} title={admin ? 'Productos' : 'Catálogo'} subtitle={admin ? `${data.products.length} producto(s) en el inventario.` : 'Productos disponibles para comprar sin conexión.'} />
       {admin ? <Button title="Nuevo producto" icon="add-circle-outline" onPress={() => setEditing(null)} /> : null}
-      <Field label="Buscar" value={search} onChangeText={setSearch} placeholder="Nombre o descripción" />
+      <Field label="Buscar productos" icon="search-outline" value={search} onChangeText={setSearch} placeholder="Nombre o descripción" returnKeyType="search" />
+      {filtered.length ? <Text style={styles.results}>{filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'}</Text> : null}
       {!filtered.length ? <EmptyState icon="cube-outline" title={search ? 'Sin resultados' : 'No hay productos'} message={search ? 'Prueba con otro término de búsqueda.' : admin ? 'Agrega el primer producto al inventario.' : 'El catálogo estará disponible cuando se agreguen productos.'} /> : filtered.map((product) => (
-        <Card key={product.id}>
+        <Card key={product.id} style={product.stock === 0 ? styles.outOfStock : undefined}>
           <View style={styles.rowBetween}>
             <View style={styles.flex}><Text style={styles.name}>{product.name}</Text><Text style={styles.price}>{formatMoney(product.unitPrice)}</Text></View>
             <Chip label={product.stock === 0 ? 'Agotado' : `${product.stock} disponibles`} tone={product.stock === 0 ? 'danger' : product.stock <= 5 ? 'warning' : 'success'} />
@@ -52,17 +53,15 @@ function ProductModal({ product, onClose, onSave }: { product: Product | null; o
     finally { setLoading(false); }
   };
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <Screen>
-        <Header eyebrow={product ? 'Editar' : 'Nuevo'} title={product ? 'Editar producto' : 'Crear producto'} subtitle="El precio se registra en pesos colombianos." />
+    <BottomSheet visible title={product ? 'Editar producto' : 'Nuevo producto'} onClose={onClose}>
+        <Text style={styles.sheetCopy}>El precio se registra en pesos colombianos.</Text>
         <Field label="Nombre" value={name} onChangeText={setName} placeholder="Nombre del producto" />
         <Field label="Descripción" value={description} onChangeText={setDescription} placeholder="Describe el producto" multiline numberOfLines={4} />
         <Field label="Stock" value={stock} onChangeText={setStock} placeholder="0" keyboardType="number-pad" />
         <Field label="Precio por unidad (COP)" value={price} onChangeText={setPrice} placeholder="0" keyboardType="number-pad" />
         <Button title="Guardar producto" onPress={submit} loading={loading} />
         <Button title="Cancelar" onPress={onClose} variant="ghost" />
-      </Screen>
-    </Modal>
+    </BottomSheet>
   );
 }
 
@@ -70,4 +69,5 @@ const styles = StyleSheet.create({
   flex: { flex: 1 }, rowBetween: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, alignItems: 'flex-start' },
   name: { color: colors.text, fontSize: 17, fontWeight: '800' }, price: { color: colors.primary, fontSize: 16, fontWeight: '800', marginTop: 4 },
   description: { color: colors.muted, lineHeight: 20 }, actions: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'flex-end', paddingTop: spacing.xs },
+  results: { color: colors.muted, fontSize: 13, fontWeight: '700', marginTop: -spacing.sm }, outOfStock: { opacity: 0.76 }, sheetCopy: { color: colors.muted, lineHeight: 20, marginTop: -spacing.sm },
 });
