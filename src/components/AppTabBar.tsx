@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, radii, shadows, spacing } from '../theme';
+import { colors, glass, radii, shadows, spacing } from '../theme';
 import { primaryTabLabels, primaryTabs } from '../navigation';
+import { GlassSurface } from './ui';
 
 const icons: Record<(typeof primaryTabs)[number], keyof typeof Ionicons.glyphMap> = {
   dashboard: 'grid-outline', sale: 'cart-outline', products: 'cube-outline', more: 'ellipsis-horizontal-circle-outline',
@@ -25,7 +25,7 @@ export function AppTabBar({ state, navigation, role }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
   const visibleRoutes = state.routes.filter((route) => primaryTabs.includes(route.name as (typeof primaryTabs)[number]));
   return <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-    <BlurView intensity={58} tint="light" style={styles.bar}>
+    <GlassSurface intensity={glass.intensityStrong} style={styles.bar}>
       {visibleRoutes.map((route) => {
         const index = state.routes.indexOf(route);
         const active = state.index === index;
@@ -41,13 +41,13 @@ export function AppTabBar({ state, navigation, role }: AppTabBarProps) {
           <Text style={[styles.label, active && styles.activeLabel]}>{label}</Text>
         </Pressable>;
       })}
-    </BlurView>
+    </GlassSurface>
   </View>;
 }
 
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: 0 },
-  bar: { minHeight: 70, borderRadius: radii.xl, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', overflow: 'hidden', ...shadows.floating },
+  bar: { minHeight: 70, borderRadius: radii.xl, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: glass.borderStrong, overflow: 'hidden', ...shadows.floating },
   item: { flex: 1, minHeight: 60, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: radii.md },
   activeItem: { backgroundColor: 'rgba(18,107,99,0.10)' }, icon: { width: 30, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: radii.sm }, activeIcon: { backgroundColor: colors.primary },
   label: { fontSize: 11, color: colors.muted, fontWeight: '700' }, activeLabel: { color: colors.primaryDark, fontWeight: '900' }, pressed: { opacity: 0.74, transform: [{ scale: 0.97 }] },

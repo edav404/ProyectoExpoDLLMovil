@@ -28,7 +28,7 @@ import {
   validatePassword,
   validateProduct,
 } from '../utils';
-import { SCHEMA, loadSnapshot, openAppDatabase, saveSnapshot, type SqlDatabase } from './database';
+import { applySchema, loadSnapshot, openAppDatabase, saveSnapshot, type SqlDatabase } from './database';
 
 const DATA_KEY = 'ventalocal:data:v1';
 // SecureStore solo permite letras, números, puntos, guiones y guiones bajos.
@@ -148,7 +148,7 @@ export class LocalStore {
   private async connection() {
     if (!this.sql) this.sql = await openAppDatabase();
     if (!this.schemaReady) {
-      await this.sql.exec(SCHEMA);
+      await applySchema(this.sql);
       this.schemaReady = true;
     }
     return this.sql;

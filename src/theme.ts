@@ -23,6 +23,14 @@ export const colors = {
   transparent: 'transparent',
 } as const;
 
+export const glass = {
+  tint: 'light' as const,
+  intensity: 34,
+  intensityStrong: 58,
+  border: 'rgba(255, 255, 255, 0.72)',
+  borderStrong: 'rgba(255, 255, 255, 0.8)',
+} as const;
+
 export const spacing = { xxs: 2, xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40 } as const;
 export const radii = { xs: 8, sm: 12, md: 18, lg: 24, xl: 32, pill: 999 } as const;
 export const motion = { fast: 140, base: 220, slow: 320 } as const;

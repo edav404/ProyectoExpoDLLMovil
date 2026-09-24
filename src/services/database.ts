@@ -11,24 +11,23 @@ export interface SqlDatabase {
   transaction<T>(task: () => Promise<T>): Promise<T>;
 }
 
-export const SCHEMA = `
-PRAGMA foreign_keys = ON;
+export const DATABASE_NAME = 'ventalocal.db';
 
-CREATE TABLE IF NOT EXISTS app_meta (
+export const SCHEMA_STATEMENTS = [
+  'PRAGMA foreign_keys = ON',
+  `CREATE TABLE IF NOT EXISTS app_meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS clients (
+)`,
+  `CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY,
   firstName TEXT NOT NULL,
   lastName TEXT NOT NULL,
   birthDate TEXT NOT NULL,
   email TEXT NOT NULL,
   isGuest INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS users (
+)`,
+  `CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL,
   passwordHash TEXT NOT NULL,
@@ -37,51 +36,58 @@ CREATE TABLE IF NOT EXISTS users (
   status TEXT NOT NULL,
   clientId TEXT REFERENCES clients(id),
   createdAt TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS tags (
+)`,
+  `CREATE TABLE IF NOT EXISTS tags (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS products (
+)`,
+  `CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL,
   stock INTEGER NOT NULL,
   unitPrice INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS product_tags (
+)`,
+  `CREATE TABLE IF NOT EXISTS product_tags (
   productId TEXT NOT NULL REFERENCES products(id),
   tagId TEXT NOT NULL REFERENCES tags(id),
   PRIMARY KEY (productId, tagId)
-);
-
-CREATE TABLE IF NOT EXISTS sale_headers (
+)`,
+  `CREATE TABLE IF NOT EXISTS sale_headers (
   id TEXT PRIMARY KEY,
   clientId TEXT NOT NULL REFERENCES clients(id),
   date TEXT NOT NULL,
   total INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS sale_details (
+)`,
+  `CREATE TABLE IF NOT EXISTS sale_details (
   id TEXT PRIMARY KEY,
   headerId TEXT NOT NULL REFERENCES sale_headers(id),
   productId TEXT NOT NULL REFERENCES products(id),
   quantity INTEGER NOT NULL,
   subtotal INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS expenses (
+)`,
+  `CREATE TABLE IF NOT EXISTS expenses (
   id TEXT PRIMARY KEY,
   concept TEXT NOT NULL,
   category TEXT NOT NULL,
   amount INTEGER NOT NULL,
   date TEXT NOT NULL,
   createdAt TEXT NOT NULL
-);
-`;
+)`,
+  'CREATE INDEX IF NOT EXISTS idx_users_clientId ON users(clientId)',
+  'CREATE INDEX IF NOT EXISTS idx_sale_headers_clientId ON sale_headers(clientId)',
+  'CREATE INDEX IF NOT EXISTS idx_sale_details_headerId ON sale_details(headerId)',
+  'CREATE INDEX IF NOT EXISTS idx_sale_details_productId ON sale_details(productId)',
+  'CREATE INDEX IF NOT EXISTS idx_product_tags_tagId ON product_tags(tagId)',
+];
+
+export const SCHEMA = `${SCHEMA_STATEMENTS.map((sql) => `${sql};`).join('\n\n')}\n`;
+
+export async function applySchema(db: SqlDatabase) {
+  for (const sql of SCHEMA_STATEMENTS) {
+    await db.exec(`${sql};`);
+  }
+}
 
 type Row = Record<string, SqlValue>;
 
@@ -94,7 +100,9 @@ function num(value: SqlValue | undefined) {
 }
 
 export async function openAppDatabase(): Promise<SqlDatabase> {
-  return adaptExpo(await openDatabaseAsync('ventalocal.db'));
+  const db = adaptExpo(await openDatabaseAsync(DATABASE_NAME));
+  await applySchema(db);
+  return db;
 }
 
 function adaptExpo(database: SQLiteDatabase): SqlDatabase {

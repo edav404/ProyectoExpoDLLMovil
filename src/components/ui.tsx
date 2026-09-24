@@ -25,7 +25,7 @@ import { usePathname, useRouter, type Href } from 'expo-router';
 
 import { useApp } from '../context/AppContext';
 import { breadcrumbs } from '../navigation';
-import { colors, motion, radii, shadows, spacing } from '../theme';
+import { colors, glass, motion, radii, shadows, spacing } from '../theme';
 
 function useReduceMotion() {
   const [reduced, setReduced] = useState(false);
@@ -93,8 +93,8 @@ export function Screen({ children, scroll = true, footer, crumb = true }: PropsW
   );
 }
 
-export function GlassSurface({ children, style, intensity = 34 }: PropsWithChildren<{ style?: object; intensity?: number }>) {
-  return <BlurView intensity={intensity} tint="light" style={[styles.glass, style]}>{children}</BlurView>;
+export function GlassSurface({ children, style, intensity = glass.intensity }: PropsWithChildren<{ style?: object; intensity?: number }>) {
+  return <BlurView intensity={intensity} tint={glass.tint} style={[styles.glass, style]}>{children}</BlurView>;
 }
 
 export function Button({ title, onPress, variant = 'primary', disabled, loading, icon, haptic = true }: {
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   screenContentWide: { paddingHorizontal: spacing.lg }, screenContentWithFooter: { paddingBottom: 248 },
   footerSlot: { position: 'absolute', left: 0, right: 0, bottom: 108, paddingHorizontal: spacing.md, alignItems: 'center' },
   footer: { width: '100%', maxWidth: 760, backgroundColor: colors.surface, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.sm, ...shadows.floating },
-  glass: { overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)' },
+  glass: { overflow: 'hidden', borderWidth: 1, borderColor: glass.border },
   button: { minHeight: 50, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1 },
   button_primary: { backgroundColor: colors.primary, borderColor: colors.primary, ...shadows.card }, button_secondary: { backgroundColor: colors.primarySoft, borderColor: colors.primarySoft },
   button_danger: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerSoft }, button_ghost: { backgroundColor: colors.surfaceGlass, borderColor: colors.border },
